@@ -1,10 +1,7 @@
 package messages
 
 import (
-	"fmt"
-	"regexp"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -25,14 +22,16 @@ func New(tgClient MessageSender) *Model {
 const regularAnswer = `
 use some of these commands:
 /start - to start the convo
-/add [your amount] - to add an amount
-/sub [your amount] - to substract an amount
-/history - to see your finance history
+/h - to see your finance history
+5000 - add 5000 tenge
+-4000 - substract 4000 tenge
 `
 
-const wrongValue = `
-try another value
-`
+const fundsUpdated = "funds updated!"
+
+// const wrongValue = `
+// try another value (try a number)
+// `
 
 const choosePeriod = `
 choose one of these options:
@@ -137,53 +136,19 @@ func history(msg Message) string {
 	return choosePeriod
 }
 
-func subFunds(msg Message) string {
+func saveFunds(msg Message) string {
 	if _, ok := users[msg.UserID]; !ok {
 		return regularAnswer
 	}
 
-	users[msg.UserID] = Info{
-		Position: "subFunds",
-		Current:  users[msg.UserID].Current,
-		History:  users[msg.UserID].History,
-	}
-
-	amount, err := strconv.Atoi(regexp.MustCompile(`\d+`).FindString(msg.Text))
-	if err != nil {
-		return wrongValue
-	}
+	amount, _ := strconv.Atoi(msg.Text)
 
 	users[msg.UserID] = Info{
-		Position: "subFunds",
-		Current:  users[msg.UserID].Current - amount,
-		History:  append(users[msg.UserID].History, Date{time.Now(), -1 * amount}),
-	}
-	return "funds substracted!"
-}
-
-func addFunds(msg Message) string {
-	if _, ok := users[msg.UserID]; !ok {
-		return regularAnswer
-	}
-
-	users[msg.UserID] = Info{
-		Position: "addFunds",
-		Current:  users[msg.UserID].Current,
-		History:  users[msg.UserID].History,
-	}
-
-	amount, err := strconv.Atoi(regexp.MustCompile(`\d+`).FindString(msg.Text))
-	fmt.Println(amount)
-	if err != nil {
-		return wrongValue
-	}
-
-	users[msg.UserID] = Info{
-		Position: "addFunds",
+		Position: "",
 		Current:  users[msg.UserID].Current + amount,
 		History:  append(users[msg.UserID].History, Date{time.Now(), amount}),
 	}
-	return "funds added!"
+	return fundsUpdated
 }
 
 func startConvo(userID int64, userName string) string {
@@ -202,15 +167,18 @@ func (s *Model) IncomingMessage(msg Message) error {
 		return s.tgClient.SendMessage(startConvo(msg.UserID, msg.UserName), msg.UserID)
 	case msg.Text == "/start":
 		return s.tgClient.SendMessage(startConvo(msg.UserID, msg.UserName), msg.UserID)
-	case strings.HasPrefix(msg.Text, "/add"):
-		return s.tgClient.SendMessage(addFunds(msg), msg.UserID)
-	case strings.HasPrefix(msg.Text, "/sub"):
-		return s.tgClient.SendMessage(subFunds(msg), msg.UserID)
-	case msg.Text == "/history":
+	case msg.Text == "/h":
 		return s.tgClient.SendMessage(history(msg), msg.UserID)
 	case msg.Text == "/day" || msg.Text == "/week" || msg.Text == "/month" || msg.Text == "/year" || msg.Text == "/all":
 		return s.tgClient.SendMessage(provideInfo(msg), msg.UserID)
+	case isNumber(msg.Text):
+		return s.tgClient.SendMessage(saveFunds(msg), msg.UserID)
 	default:
 		return s.tgClient.SendMessage(regularAnswer, msg.UserID)
 	}
+}
+
+func isNumber(s string) bool {
+	_, err := strconv.Atoi(s)
+	return err == nil
 }
