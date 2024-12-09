@@ -3,14 +3,11 @@ package config
 import (
 	"os"
 
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v3"
+	"github.com/joho/godotenv"
 )
 
-const configFile = "data/config.yaml"
-
 type Config struct {
-	Token string `yaml:"token"`
+	Token string
 }
 
 type Service struct {
@@ -18,16 +15,17 @@ type Service struct {
 }
 
 func New() (*Service, error) {
-	s := &Service{}
-
-	rawYAML, err := os.ReadFile(configFile)
+	err := godotenv.Load()
 	if err != nil {
-		return nil, errors.Wrap(err, "reading config file")
+		return nil, err
 	}
 
-	err = yaml.Unmarshal(rawYAML, &s.config)
-	if err != nil {
-		return nil, errors.Wrap(err, "parsing yaml")
+	token := os.Getenv("token")
+
+	s := &Service{
+		Config{
+			Token: token,
+		},
 	}
 
 	return s, nil
